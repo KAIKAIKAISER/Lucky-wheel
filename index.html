@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>做决定小助手 - 幸运转盘</title>
+    <title>做决定小助手 - 云同步版</title>
+    <!-- 引入好看的字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <!-- 引入 Supabase 客户端库 -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -45,7 +48,7 @@
             display: flex;
             flex-direction: column;
             padding: 24px 16px;
-            overflow-y: auto;
+            overflow-y: hidden;
             flex-shrink: 0;
             z-index: 10;
         }
@@ -59,10 +62,18 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-shrink: 0;
         }
         .sidebar h2::before { content: '⚡'; font-size: 1.2rem; }
         
-        .topic-list { list-style: none; flex-grow: 1; }
+        .topic-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding-right: 4px;
+        }
+
+        .topic-list { list-style: none; }
         
         .topic-item {
             padding: 14px 16px;
@@ -80,229 +91,125 @@
         }
         
         .topic-text {
-            flex: 1;
-            margin-right: 10px;
-            word-break: break-word; /* 允许长文字换行 */
-            white-space: normal;
-            line-height: 1.4;
+            flex: 1; margin-right: 10px; word-break: break-word; white-space: normal; line-height: 1.4;
         }
         
         .topic-item:hover { background: rgba(255,255,255, 0.6); }
-        
-        .topic-item.active { 
-            background: #fff; 
-            color: #6c5ce7; 
-            font-weight: 600; 
-            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.15);
-        }
+        .topic-item.active { background: #fff; color: #6c5ce7; font-weight: 600; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.15); }
         
         .btn-delete-topic { 
-            font-size: 14px; 
-            opacity: 0; 
-            padding: 6px 10px;
-            border-radius: 6px;
-            transition: 0.2s;
-            flex-shrink: 0;
+            font-size: 14px; opacity: 0; padding: 6px 10px; border-radius: 6px; transition: 0.2s; flex-shrink: 0;
         }
         .topic-item:hover .btn-delete-topic { opacity: 0.5; }
         .topic-item.active .btn-delete-topic { opacity: 0.8; }
         .btn-delete-topic:hover { opacity: 1 !important; background: #ffecec; color: #d63031; }
 
         .btn-add-topic {
-            margin-top: 10px;
-            padding: 14px;
-            background: white;
-            border: 2px dashed #b2bec3;
-            color: #636e72;
-            cursor: pointer;
-            text-align: center;
-            border-radius: 12px;
-            font-weight: 500;
-            transition: 0.3s;
+            width: 100%; padding: 12px; background: white; border: 2px dashed #b2bec3;
+            color: #636e72; cursor: pointer; text-align: center; border-radius: 12px;
+            font-weight: 500; transition: 0.3s; flex-shrink: 0; margin-bottom: 15px;
+        }
+        .btn-add-topic:hover { border-color: #6c5ce7; color: #6c5ce7; background: rgba(255,255,255,0.8); }
+
+        /* 云同步区域 */
+        .cloud-sync-area {
+            border-top: 1px solid rgba(255,255,255,0.4);
+            padding-top: 15px;
             flex-shrink: 0;
         }
-        .btn-add-topic:hover { 
-            border-color: #6c5ce7; 
-            color: #6c5ce7; 
-            background: rgba(255,255,255,0.8);
+        .sync-input {
+            width: 100%; padding: 10px; border-radius: 10px; border: none;
+            background: rgba(255,255,255,0.7); margin-bottom: 8px;
+            font-size: 12px; color: #2d3436;
         }
+        .sync-input:focus { outline: 2px solid #a29bfe; background: white; }
+        
+        .btn-cloud {
+            width: 100%; padding: 10px; border: none; border-radius: 10px;
+            color: white; font-size: 13px; cursor: pointer; transition: 0.2s;
+            font-weight: 600; background: #00b894;
+            display: flex; justify-content: center; align-items: center; gap: 6px;
+        }
+        .btn-cloud:hover { background: #00a884; transform: translateY(-1px); }
+        .btn-cloud:disabled { background: #b2bec3; cursor: wait; transform: none; }
 
         /* --- 右侧主内容 --- */
         .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 30px;
-            overflow-y: auto;
-            position: relative;
+            flex-grow: 1; display: flex; flex-direction: column; align-items: center;
+            padding: 30px; overflow-y: auto; position: relative;
         }
 
-        /* 输入区卡片 */
         .input-card {
-            background: var(--glass-bg);
-            padding: 20px 30px;
-            border-radius: 20px;
-            box-shadow: var(--shadow-soft);
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 30px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.6);
+            background: var(--glass-bg); padding: 20px 30px; border-radius: 20px;
+            box-shadow: var(--shadow-soft); width: 100%; max-width: 600px;
+            margin-bottom: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.6);
             flex-shrink: 0;
-            position: relative;
         }
 
         .header-area input {
-            font-family: inherit;
-            font-size: 1.8rem;
-            font-weight: 700;
-            text-align: center;
-            border: none;
-            background: transparent;
-            width: 100%;
-            color: #2d3436;
-            margin-bottom: 10px;
-            padding: 5px;
+            font-family: inherit; font-size: 1.8rem; font-weight: 700; text-align: center;
+            border: none; background: transparent; width: 100%; color: #2d3436;
+            margin-bottom: 10px; padding: 5px;
         }
         .header-area input::placeholder { color: #b2bec3; font-weight: 400; }
         .header-area input:focus { outline: none; }
 
-        .options-editor { position: relative; }
         .options-editor textarea {
-            width: 100%;
-            height: 60px;
-            padding: 10px;
-            border: none;
-            border-bottom: 2px solid #dfe6e9;
-            background: transparent;
-            resize: none;
-            font-family: inherit;
-            font-size: 0.95rem;
-            text-align: center;
-            transition: 0.3s;
-            color: #636e72;
+            width: 100%; height: 60px; padding: 10px; border: none;
+            border-bottom: 2px solid #dfe6e9; background: transparent; resize: none;
+            font-family: inherit; font-size: 0.95rem; text-align: center; transition: 0.3s; color: #636e72;
         }
         .options-editor textarea:focus { border-bottom-color: #a29bfe; outline: none; background: rgba(255,255,255,0.5); }
         
         .options-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 8px;
-            font-size: 12px;
+            display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px;
         }
         .options-hint { color: #a4b0be; }
-        
-        /* 保存状态指示器 */
         .save-status {
-            color: var(--success-color);
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-weight: 600;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            color: var(--success-color); opacity: 0; transition: opacity 0.3s;
+            font-weight: 600; font-size: 12px;
         }
         .save-status.visible { opacity: 1; }
 
         /* --- 转盘 --- */
         .wheel-wrapper {
-            position: relative;
-            padding: 10px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
-            flex-shrink: 0;
+            position: relative; padding: 10px; background: white; border-radius: 50%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15); flex-shrink: 0;
         }
-
-        .wheel-container {
-            position: relative;
-            width: 380px;
-            height: 380px;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            border-radius: 50%;
-            transition: transform 4s cubic-bezier(0.15, 0.9, 0.30, 1);
-        }
+        .wheel-container { position: relative; width: 380px; height: 380px; }
+        canvas { width: 100%; height: 100%; display: block; border-radius: 50%; transition: transform 4s cubic-bezier(0.15, 0.9, 0.30, 1); }
 
         .pointer {
-            position: absolute;
-            top: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 50px;
-            z-index: 20;
-            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
+            position: absolute; top: -25px; left: 50%; transform: translateX(-50%);
+            width: 40px; height: 50px; z-index: 20; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
         }
         .pointer::after {
-            content: '';
-            position: absolute;
-            left: 0; top: 0;
-            width: 40px; height: 40px;
-            background: var(--accent-color);
-            border-radius: 50% 50% 0;
-            transform: rotate(-45deg);
-            border: 3px solid white;
+            content: ''; position: absolute; left: 0; top: 0; width: 40px; height: 40px;
+            background: var(--accent-color); border-radius: 50% 50% 0; transform: rotate(-45deg); border: 3px solid white;
         }
         
         .spin-btn {
-            margin-top: 35px;
-            padding: 16px 60px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 10px 25px rgba(118, 75, 162, 0.4);
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-            letter-spacing: 1px;
-            flex-shrink: 0;
+            margin-top: 35px; padding: 16px 60px; font-size: 1.2rem; font-weight: 700;
+            background: var(--primary-gradient); color: white; border: none; border-radius: 50px;
+            cursor: pointer; box-shadow: 0 10px 25px rgba(118, 75, 162, 0.4);
+            transition: all 0.3s; position: relative; overflow: hidden; letter-spacing: 1px; flex-shrink: 0;
         }
         .spin-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(118, 75, 162, 0.5); }
         .spin-btn:active { transform: scale(0.95); }
         .spin-btn:disabled { background: #b2bec3; cursor: not-allowed; transform: none; box-shadow: none; }
 
         .result-container {
-            margin-top: 20px;
-            min-height: 80px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
-            padding-bottom: 20px;
+            margin-top: 20px; min-height: 80px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-bottom: 20px;
         }
-
         .result-text {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2d3436;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.5s;
+            font-size: 1.8rem; font-weight: 700; color: #2d3436; opacity: 0; transform: translateY(10px); transition: all 0.5s;
         }
         .result-text.show { opacity: 1; transform: translateY(0); }
 
         .warning-msg {
-            background: #ff7675;
-            color: white;
-            font-size: 0.85rem;
-            margin-top: 10px;
-            padding: 6px 16px;
-            border-radius: 20px;
-            box-shadow: 0 4px 10px rgba(255, 118, 117, 0.4);
-            display: none;
-            animation: shake 0.5s;
+            background: #ff7675; color: white; font-size: 0.85rem; margin-top: 10px;
+            padding: 6px 16px; border-radius: 20px; box-shadow: 0 4px 10px rgba(255, 118, 117, 0.4);
+            display: none; animation: shake 0.5s;
         }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -312,65 +219,36 @@
 
         /* --- 移动端适配 --- */
         @media (max-width: 768px) {
-            body { flex-direction: column; }
-            .app-container { flex-direction: column; }
-            
+            body { flex-direction: column; } .app-container { flex-direction: column; }
             .sidebar { 
-                width: 100%; 
-                height: auto; 
-                padding: 10px;
-                flex-direction: row; 
-                overflow-x: auto; 
-                background: rgba(255,255,255,0.95);
-                border-right: none;
-                border-bottom: 1px solid #eee;
-                align-items: center;
-                scrollbar-width: none; 
+                width: 100%; height: auto; padding: 10px; flex-direction: row; 
+                overflow-x: auto; overflow-y: hidden; background: rgba(255,255,255,0.95);
+                border-right: none; border-bottom: 1px solid #eee; align-items: center; scrollbar-width: none; 
             }
             .sidebar::-webkit-scrollbar { display: none; } 
-
             .sidebar h2 { display: none; }
             
-            .topic-list { 
-                display: flex; 
-                flex-direction: row; 
-                gap: 10px; 
-                padding: 0 10px;
+            /* 移动端将云同步隐藏在侧边或者缩小，这里为了布局整洁，我们把云同步放在最右侧 */
+            .cloud-sync-area {
+                padding-top: 0; border: none; margin-left: auto; display: flex; gap: 5px; align-items: center;
             }
-            
-            .topic-item { 
-                margin-bottom: 0; 
-                padding: 6px 16px; 
-                font-size: 13px; 
-                border-radius: 20px;
-                background: #f1f2f6;
-                border: 1px solid transparent;
-                min-height: auto;
-            }
+            .sync-input { width: 100px; margin-bottom: 0; padding: 6px; }
+            .btn-cloud { width: auto; padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+            .btn-cloud span { display: none; } /* 手机端只显示图标 */
+
+            .topic-list-container { display: flex; flex-direction: row; margin-bottom: 0; padding-right: 0; flex-grow: 1; }
+            .topic-list { display: flex; flex-direction: row; gap: 10px; }
+            .topic-item { margin-bottom: 0; padding: 6px 16px; font-size: 13px; border-radius: 20px; background: #f1f2f6; border: 1px solid transparent; min-height: auto; }
             .topic-text { white-space: nowrap; margin-right: 6px; }
-            
-            .topic-item.active {
-                background: var(--primary-gradient);
-                color: white;
-                box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3);
-            }
-            .topic-item:hover { transform: none; }
+            .topic-item.active { background: var(--primary-gradient); color: white; box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3); }
             
             .btn-add-topic { 
-                margin-top: 0; margin-left: 5px; 
-                white-space: nowrap; height: 32px; width: 32px;
-                padding: 0; display: flex; align-items: center; justify-content: center;
-                border-radius: 50%; border-style: solid;
+                margin-bottom: 0; margin-left: 5px; margin-right: 5px; white-space: nowrap; height: 32px; width: 32px;
+                padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; border-style: solid;
             }
-
-            .main-content { padding: 15px; }
-            .input-card { padding: 15px; margin-bottom: 15px; }
-            .header-area input { font-size: 1.4rem; }
-            
-            .wheel-wrapper { padding: 6px; }
-            .wheel-container { width: 280px; height: 280px; }
-            
-            .spin-btn { width: 100%; margin-top: 25px; }
+            .main-content { padding: 15px; } .input-card { padding: 15px; margin-bottom: 15px; }
+            .header-area input { font-size: 1.4rem; } .wheel-wrapper { padding: 6px; }
+            .wheel-container { width: 280px; height: 280px; } .spin-btn { width: 100%; margin-top: 25px; }
         }
     </style>
 </head>
@@ -380,15 +258,26 @@
     <!-- 左侧列表 -->
     <div class="sidebar" id="sidebar">
         <h2>我的决定</h2>
-        <ul class="topic-list" id="topicList">
-            <!-- JS生成列表项 -->
-        </ul>
-        <div class="btn-add-topic" id="btnAddTopic" title="添加新决定">+</div>
+        
+        <div class="topic-list-container">
+            <ul class="topic-list" id="topicList">
+                <!-- JS生成列表项 -->
+            </ul>
+        </div>
+
+        <div class="btn-add-topic" id="btnAddTopic" title="添加新决定">+ 新建</div>
+        
+        <!-- 云同步控制区 -->
+        <div class="cloud-sync-area">
+            <input type="text" id="syncKeyInput" class="sync-input" placeholder="输入同步暗号(如: jack88)">
+            <button class="btn-cloud" id="btnSync" onclick="startCloudSync()">
+                ☁️ <span>同步</span>
+            </button>
+        </div>
     </div>
 
     <!-- 右侧主区域 -->
     <div class="main-content">
-        
         <div class="input-card">
             <div class="header-area">
                 <input type="text" id="topicTitle" placeholder="标题（如：去哪玩）" autocomplete="off">
@@ -419,6 +308,24 @@
 </div>
 
 <script>
+    // ============================================================
+    // ⚠️⚠️⚠️ 请在这里填入你的 Supabase 配置信息 ⚠️⚠️⚠️
+    // ============================================================
+    const supabaseConfig = {
+        url: 'https://xaniobacfeluxrivonoz.supabase.co',  // 替换 Project URL
+        key: 'sb_publishable_ExJJzJmSAYxw0nTqQNWy3A_eGYjjb5K	'              // 替换 API Key
+    };
+    
+    // 初始化 Supabase 客户端
+    let supabase = null;
+    try {
+        if (supabaseConfig.url.includes('你的项目ID')) {
+            console.warn("请在代码中配置 Supabase URL 和 Key 才能使用云同步功能");
+        } else {
+            supabase = window.supabase.createClient(supabaseConfig.url, supabaseConfig.key);
+        }
+    } catch (e) { console.error("Supabase Init Error", e); }
+
     // --- 数据配置 ---
     const defaultTopics = [
         { id: 't1', title: "去哪里旅游", options: ["上海", "东京", "纽约", "曼谷", "雅加达", "吉隆坡"] },
@@ -431,14 +338,13 @@
         "#54a0ff", "#5f27cd", "#ff9f43", "#00d2d3", "#ff6b81"
     ];
 
-    // 核心状态
     let topics = [];
     let currentTopicId = null;
     let currentRotation = 0; 
     let isSpinning = false;
     let sessionCounts = {}; 
 
-    // DOM 元素缓存
+    // DOM 元素
     const els = {
         sidebar: document.getElementById('sidebar'),
         topicList: document.getElementById('topicList'),
@@ -449,94 +355,134 @@
         canvas: document.getElementById('wheelCanvas'),
         spinBtn: document.getElementById('spinBtn'),
         resultText: document.getElementById('resultText'),
-        warningMsg: document.getElementById('warningMsg')
+        warningMsg: document.getElementById('warningMsg'),
+        syncInput: document.getElementById('syncKeyInput'),
+        btnSync: document.getElementById('btnSync')
     };
-    
-    // Canvas 上下文
     const ctx = els.canvas.getContext('2d');
 
     // --- 初始化 ---
     function init() {
-        // 尝试从不同的key恢复数据，防止版本更新导致数据丢失
-        let stored = localStorage.getItem('decisionMaker_universal_data');
-        if (!stored) stored = localStorage.getItem('decisionMakerData_v3');
-        if (!stored) stored = localStorage.getItem('decisionMakerData_v2');
-        if (!stored) stored = localStorage.getItem('decisionMakerData');
-
+        // 先从本地加载
+        let stored = localStorage.getItem('decisionMaker_db_data');
         if (stored) {
-            try {
-                topics = JSON.parse(stored);
-            } catch(e) {
-                console.error("数据损坏，重置为默认", e);
-                topics = JSON.parse(JSON.stringify(defaultTopics));
-            }
+            try { topics = JSON.parse(stored); } catch(e) { topics = JSON.parse(JSON.stringify(defaultTopics)); }
         } else {
             topics = JSON.parse(JSON.stringify(defaultTopics));
         }
 
-        // 数据清洗：确保每个topic都有id和options
+        // 尝试加载上次使用的同步暗号
+        const lastSyncKey = localStorage.getItem('decisionMaker_last_sync_key');
+        if (lastSyncKey) els.syncInput.value = lastSyncKey;
+
+        // 数据清洗
         topics.forEach(t => {
             if(!t.options) t.options = ["默认选项"];
             if(!t.id) t.id = 't' + Math.random().toString(36).substr(2, 9);
         });
 
-        // 选中第一个或创建新的
-        if (topics.length > 0) {
-            selectTopic(topics[0].id);
-        } else {
-            createNewTopic();
-        }
+        if (topics.length > 0) selectTopic(topics[0].id);
+        else createNewTopic();
 
         renderSidebar();
         bindEvents();
     }
 
-    // --- 数据保存 ---
     function saveData() {
-        try {
-            // 使用统一的 Key
-            localStorage.setItem('decisionMaker_universal_data', JSON.stringify(topics));
-            showSaveStatus();
-        } catch (e) {
-            console.error("保存失败 (可能是隐私模式或空间已满):", e);
-        }
+        localStorage.setItem('decisionMaker_db_data', JSON.stringify(topics));
+        showSaveStatus();
     }
 
     let saveTimeout;
     function showSaveStatus() {
         els.saveStatus.classList.add('visible');
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            els.saveStatus.classList.remove('visible');
-        }, 1500);
+        saveTimeout = setTimeout(() => { els.saveStatus.classList.remove('visible'); }, 1500);
     }
 
-    // --- 核心逻辑 ---
-    function getTopic(id) { 
-        return topics.find(t => t.id === id); 
+    // --- ☁️ 云同步核心逻辑 ---
+    async function startCloudSync() {
+        if (!supabase) return alert("请先在 HTML 代码中配置 Supabase URL 和 Key！");
+        
+        const syncKey = els.syncInput.value.trim();
+        if (!syncKey) return alert("请输入一个同步暗号！\n（例如你的名字+数字，两台设备输入一样的即可同步）");
+
+        const btn = els.btnSync;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "⏳";
+        btn.disabled = true;
+
+        try {
+            // 1. 查询云端是否存在此暗号的数据
+            const { data, error } = await supabase
+                .from('user_decisions')
+                .select('content')
+                .eq('sync_key', syncKey)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (data) {
+                // A. 云端有数据
+                const userChoice = confirm(`☁️ 在云端发现暗号 [${syncKey}] 的数据！\n\n【确定】= 下载云端数据覆盖本地\n【取消】= 将本地数据上传覆盖云端`);
+                
+                if (userChoice) {
+                    // 下载
+                    if (data.content && Array.isArray(data.content)) {
+                        topics = data.content;
+                        saveData();
+                        selectTopic(topics[0].id);
+                        alert("✅ 同步成功：已下载云端数据！");
+                    }
+                } else {
+                    // 上传覆盖
+                    await uploadToCloud(syncKey);
+                }
+            } else {
+                // B. 云端无数据 -> 自动上传
+                await uploadToCloud(syncKey);
+            }
+
+            // 记住暗号
+            localStorage.setItem('decisionMaker_last_sync_key', syncKey);
+
+        } catch (err) {
+            console.error(err);
+            alert("❌ 同步出错：" + err.message);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
+
+    async function uploadToCloud(key) {
+        // Upsert: 存在则更新，不存在则插入
+        const { error } = await supabase
+            .from('user_decisions')
+            .upsert({ sync_key: key, content: topics }, { onConflict: 'sync_key' });
+            
+        if (error) throw error;
+        alert("✅ 同步成功：本地数据已上传到云端！\n其他设备输入此暗号即可下载。");
+    }
+
+    // --- 常规逻辑 ---
+    function getTopic(id) { return topics.find(t => t.id === id); }
 
     function selectTopic(id) {
         const topic = getTopic(id);
         if (!topic) return;
-
         currentTopicId = id;
         
-        // 更新 UI
         els.topicTitle.value = topic.title || "";
-        // 转换选项数组为字符串，用空格连接
         els.topicOptions.value = Array.isArray(topic.options) ? topic.options.join(' ') : "";
         
-        // 重置结果显示
         els.resultText.innerText = "";
         els.resultText.classList.remove('show');
         els.warningMsg.style.display = 'none';
         
-        // 重置计数器
         sessionCounts = {}; 
         topic.options.forEach(opt => sessionCounts[opt] = 0);
 
-        // 重置转盘角度
         currentRotation = 0;
         els.canvas.style.transform = `rotate(0deg)`;
 
@@ -550,31 +496,25 @@
         topics.push(newTopic);
         saveData();
         selectTopic(newId);
-        
-        // 滚动逻辑
         setTimeout(() => {
             if (window.innerWidth <= 768) {
                 els.sidebar.scrollLeft = els.sidebar.scrollWidth;
             } else {
-                els.topicList.scrollTop = els.topicList.scrollHeight;
+                const container = document.querySelector('.topic-list-container');
+                container.scrollTop = container.scrollHeight;
             }
         }, 100);
     }
 
     function deleteTopic(id, event) {
-        event.stopPropagation(); // 防止触发 selectTopic
-        if (confirm("确定要删除这个决定事项吗？")) {
+        event.stopPropagation();
+        if (confirm("确定要删除吗？")) {
             topics = topics.filter(t => t.id !== id);
-            if (topics.length === 0) {
-                createNewTopic();
-            } else {
-                // 如果删除的是当前选中的，切换到第一个
-                if (currentTopicId === id) {
-                    selectTopic(topics[0].id);
-                } else {
-                    saveData();
-                    renderSidebar();
-                }
+            if (topics.length === 0) createNewTopic();
+            else if (currentTopicId === id) selectTopic(topics[0].id);
+            else {
+                saveData();
+                renderSidebar();
             }
         }
     }
@@ -584,16 +524,11 @@
         const topic = getTopic(currentTopicId);
         if (!topic) return;
 
-        // 1. 更新标题
         topic.title = els.topicTitle.value;
-        
-        // 2. 更新选项
         let rawOptions = els.topicOptions.value;
-        // 兼容中文逗号、英文逗号、换行符、空格
         let opts = rawOptions.split(/[,\uff0c\n\s]+/).filter(t => t.trim() !== "");
         if (opts.length === 0) opts = ["?"];
         
-        // 如果选项内容有变，重置计数
         if(JSON.stringify(topic.options) !== JSON.stringify(opts)) {
             sessionCounts = {};
             opts.forEach(o => sessionCounts[o] = 0);
@@ -603,11 +538,7 @@
         }
 
         topic.options = opts;
-        
-        // 3. 执行保存和渲染
         saveData();
-        
-        // 仅更新标题列表文字，不完全重绘避免输入中断（但这里简化处理直接重绘）
         renderSidebar(); 
         drawWheel();
     }
@@ -619,10 +550,7 @@
             const li = document.createElement('li');
             li.className = `topic-item ${topic.id === currentTopicId ? 'active' : ''}`;
             li.onclick = () => selectTopic(topic.id);
-            
-            // 完整显示标题
             const displayTitle = topic.title || '(无标题)';
-
             li.innerHTML = `
                 <span class="topic-text">${displayTitle}</span> 
                 <span class="btn-delete-topic" onclick="deleteTopic('${topic.id}', event)">✕</span>
@@ -635,7 +563,6 @@
         if (!currentTopicId) return;
         const topic = getTopic(currentTopicId);
         if (!topic) return;
-
         const options = topic.options;
         const len = options.length;
         const arc = 2 * Math.PI / len;
@@ -665,21 +592,16 @@
             ctx.font = "bold 40px 'Noto Sans SC', sans-serif";
             ctx.shadowColor = "rgba(0,0,0,0.1)";
             ctx.shadowBlur = 4;
-            
             let text = opt;
-            // 转盘上的文字太长还是稍微截断一下比较好看，否则会叠在一起
             if (text.length > 8) text = text.substring(0, 7) + "..";
             ctx.fillText(text, radius - 40, 14);
             ctx.restore();
         });
 
-        // 装饰中心
         ctx.beginPath();
         ctx.arc(cx, cy, 50, 0, 2 * Math.PI);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
-        
-        // 装饰外环
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
         ctx.lineWidth = 10;
@@ -687,7 +609,6 @@
         ctx.stroke();
     }
 
-    // --- 旋转 ---
     function spin() {
         if (isSpinning) return;
         const topic = getTopic(currentTopicId);
@@ -712,13 +633,11 @@
     function finishSpin(rotation, options) {
         isSpinning = false;
         els.spinBtn.disabled = false;
-
         const actualDeg = rotation % 360;
         const sliceDeg = 360 / options.length;
         let degFromStart = (360 - actualDeg + 270) % 360;
         let index = Math.floor(degFromStart / sliceDeg);
         index = index % options.length;
-
         const result = options[index];
         
         if (!sessionCounts[result]) sessionCounts[result] = 0;
@@ -734,15 +653,11 @@
 
     function bindEvents() {
         els.btnAddTopic.addEventListener('click', createNewTopic);
-        
-        // 使用 input 事件确保实时保存
         els.topicTitle.addEventListener('input', updateCurrentTopic);
         els.topicOptions.addEventListener('input', updateCurrentTopic);
-        
         els.spinBtn.addEventListener('click', spin);
     }
 
-    // 启动
     init();
 
 </script>
