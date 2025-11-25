@@ -219,37 +219,135 @@
 
         /* --- 移动端适配 --- */
         @media (max-width: 768px) {
-            body { flex-direction: column; } .app-container { flex-direction: column; }
-            .sidebar { 
-                width: 100%; height: auto; padding: 10px; flex-direction: row; 
-                overflow-x: auto; overflow-y: hidden; background: rgba(255,255,255,0.95);
-                border-right: none; border-bottom: 1px solid #eee; align-items: center; scrollbar-width: none; 
-            }
-            .sidebar::-webkit-scrollbar { display: none; } 
-            .sidebar h2 { display: none; }
-            
-            /* 移动端将云同步隐藏在侧边或者缩小，这里为了布局整洁，我们把云同步放在最右侧 */
-            .cloud-sync-area {
-                padding-top: 0; border: none; margin-left: auto; display: flex; gap: 5px; align-items: center;
-            }
-            .sync-input { width: 100px; margin-bottom: 0; padding: 6px; }
-            .btn-cloud { width: auto; padding: 6px 10px; font-size: 12px; white-space: nowrap; }
-            .btn-cloud span { display: none; } /* 手机端只显示图标 */
+           /* --- 移动端适配优化版 --- */
+@media (max-width: 768px) {
+    body { 
+        flex-direction: column; 
+    } 
+    
+    .app-container { 
+        flex-direction: column; 
+    }
+    
+    /* 侧边栏改为顶部容器 */
+    .sidebar { 
+        width: 100%; 
+        height: auto; 
+        padding: 12px 16px; /* 增加内边距 */
+        background: rgba(255,255,255,0.95);
+        border-right: none; 
+        border-bottom: 1px solid #eee;
+        
+        /* 关键：使用 Flex 换行布局 */
+        display: flex;
+        flex-wrap: wrap; 
+        align-items: center;
+        gap: 10px; /* 元素之间的间隙 */
+        overflow: visible; /* 允许子元素溢出（主要是为了阴影） */
+    }
+    
+    .sidebar h2 { display: none; }
+    
+    /* 第一行：左侧占据剩余空间（放列表） */
+    .topic-list-container { 
+        flex: 1; /* 占据第一行剩余空间 */
+        min-width: 0; /* 防止溢出 */
+        margin-bottom: 0;
+        padding-right: 0;
+        overflow-x: auto; /* 允许横向滚动 */
+    }
+    
+    .topic-list { 
+        display: flex; 
+        flex-direction: row; 
+        gap: 8px; 
+    }
+    
+    /* 胶囊按钮优化 */
+    .topic-item { 
+        margin-bottom: 0; 
+        padding: 8px 16px; /* 更大的点击区域 */
+        font-size: 14px; 
+        border-radius: 20px;
+        background: #f1f2f6;
+        border: 1px solid transparent;
+        min-height: auto;
+        flex-shrink: 0; /* 防止被挤压 */
+        transition: all 0.2s;
+    }
+    
+    .topic-text { 
+        white-space: nowrap; 
+        margin-right: 4px; 
+    }
+    
+    .topic-item.active {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
+        transform: scale(1.05); /* 选中时稍微放大 */
+    }
+    
+    /* 添加按钮：放在第一行最右侧 */
+    .btn-add-topic { 
+        margin: 0;
+        white-space: nowrap; 
+        height: 36px; 
+        width: 36px;
+        padding: 0; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        border-radius: 50%; 
+        border-style: solid;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 
-            .topic-list-container { display: flex; flex-direction: row; margin-bottom: 0; padding-right: 0; flex-grow: 1; }
-            .topic-list { display: flex; flex-direction: row; gap: 10px; }
-            .topic-item { margin-bottom: 0; padding: 6px 16px; font-size: 13px; border-radius: 20px; background: #f1f2f6; border: 1px solid transparent; min-height: auto; }
-            .topic-text { white-space: nowrap; margin-right: 6px; }
-            .topic-item.active { background: var(--primary-gradient); color: white; box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3); }
-            
-            .btn-add-topic { 
-                margin-bottom: 0; margin-left: 5px; margin-right: 5px; white-space: nowrap; height: 32px; width: 32px;
-                padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; border-style: solid;
-            }
-            .main-content { padding: 15px; } .input-card { padding: 15px; margin-bottom: 15px; }
-            .header-area input { font-size: 1.4rem; } .wheel-wrapper { padding: 6px; }
-            .wheel-container { width: 280px; height: 280px; } .spin-btn { width: 100%; margin-top: 25px; }
-        }
+    /* 第二行：云同步区域（独占一行） */
+    .cloud-sync-area {
+        width: 100%; /* 强制换行 */
+        padding-top: 5px; 
+        border: none; 
+        margin-left: 0; 
+        display: flex; 
+        gap: 8px; 
+        align-items: center;
+    }
+    
+    /* 输入框优化：更宽，更容易点 */
+    .sync-input { 
+        flex-grow: 1; /* 占据剩余宽度 */
+        width: auto; 
+        margin-bottom: 0; 
+        padding: 8px 12px; 
+        font-size: 14px;
+        background: #f5f6fa;
+        border: 1px solid #dcdde1;
+    }
+    
+    /* 同步按钮优化 */
+    .btn-cloud { 
+        width: auto; 
+        padding: 8px 16px; 
+        font-size: 13px; 
+        white-space: nowrap; 
+        flex-shrink: 0;
+    }
+    
+    .btn-cloud span { display: inline; } /* 手机端也显示文字，防止看不懂 */
+
+    /* 主内容区域微调 */
+    .main-content { padding: 15px; }
+    .input-card { padding: 15px; margin-bottom: 20px; }
+    .header-area input { font-size: 1.5rem; }
+    
+    .wheel-wrapper { padding: 8px; }
+    /* 稍微缩小转盘以适应小屏手机 */
+    .wheel-container { width: 300px; height: 300px; max-width: 80vw; max-height: 80vw; }
+    
+    .spin-btn { width: 100%; margin-top: 25px; padding: 14px; }
+}
     </style>
 </head>
 <body>
