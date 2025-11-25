@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>做决定小助手 - 幸运转盘</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-gradient: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --sidebar-bg: rgba(255, 255, 255, 0.5);
+            --text-main: #2d3436;
+            --text-sub: #636e72;
+            --accent-color: #ff7675;
+            --success-color: #00b894;
+            --shadow-soft: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: 'Poppins', 'Noto Sans SC', sans-serif; 
+            background-image: var(--bg-gradient);
+            height: 100vh; 
+            display: flex; 
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* --- 布局容器 --- */
+        .app-container { 
+            display: flex; 
+            width: 100%; 
+            height: 100%; 
+            backdrop-filter: blur(4px);
+        }
+        
+        /* --- 左侧侧边栏 --- */
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 16px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .sidebar h2 { 
+            font-size: 1.1rem; 
+            margin-bottom: 20px; 
+            padding-left: 8px;
+            color: var(--text-main);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar h2::before { content: '⚡'; font-size: 1.2rem; }
+        
+        .topic-list { list-style: none; flex-grow: 1; }
+        
+        .topic-item {
+            padding: 14px 16px;
+            cursor: pointer;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            background: transparent;
+            min-height: 50px;
+        }
+        
+        .topic-text {
+            flex: 1;
+            margin-right: 10px;
+            word-break: break-word; /* 允许长文字换行 */
+            white-space: normal;
+            line-height: 1.4;
+        }
+        
+        .topic-item:hover { background: rgba(255,255,255, 0.6); }
+        
+        .topic-item.active { 
+            background: #fff; 
+            color: #6c5ce7; 
+            font-weight: 600; 
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.15);
+        }
+        
+        .btn-delete-topic { 
+            font-size: 14px; 
+            opacity: 0; 
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: 0.2s;
+            flex-shrink: 0;
+        }
+        .topic-item:hover .btn-delete-topic { opacity: 0.5; }
+        .topic-item.active .btn-delete-topic { opacity: 0.8; }
+        .btn-delete-topic:hover { opacity: 1 !important; background: #ffecec; color: #d63031; }
+
+        .btn-add-topic {
+            margin-top: 10px;
+            padding: 14px;
+            background: white;
+            border: 2px dashed #b2bec3;
+            color: #636e72;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 12px;
+            font-weight: 500;
+            transition: 0.3s;
+            flex-shrink: 0;
+        }
+        .btn-add-topic:hover { 
+            border-color: #6c5ce7; 
+            color: #6c5ce7; 
+            background: rgba(255,255,255,0.8);
+        }
+
+        /* --- 右侧主内容 --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 输入区卡片 */
+        .input-card {
+            background: var(--glass-bg);
+            padding: 20px 30px;
+            border-radius: 20px;
+            box-shadow: var(--shadow-soft);
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.6);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .header-area input {
+            font-family: inherit;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+            border: none;
+            background: transparent;
+            width: 100%;
+            color: #2d3436;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        .header-area input::placeholder { color: #b2bec3; font-weight: 400; }
+        .header-area input:focus { outline: none; }
+
+        .options-editor { position: relative; }
+        .options-editor textarea {
+            width: 100%;
+            height: 60px;
+            padding: 10px;
+            border: none;
+            border-bottom: 2px solid #dfe6e9;
+            background: transparent;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            text-align: center;
+            transition: 0.3s;
+            color: #636e72;
+        }
+        .options-editor textarea:focus { border-bottom-color: #a29bfe; outline: none; background: rgba(255,255,255,0.5); }
+        
+        .options-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+        .options-hint { color: #a4b0be; }
+        
+        /* 保存状态指示器 */
+        .save-status {
+            color: var(--success-color);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .save-status.visible { opacity: 1; }
+
+        /* --- 转盘 --- */
+        .wheel-wrapper {
+            position: relative;
+            padding: 10px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 380px;
+            height: 380px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 50%;
+            transition: transform 4s cubic-bezier(0.15, 0.9, 0.30, 1);
+        }
+
+        .pointer {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            z-index: 20;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
+        }
+        .pointer::after {
+            content: '';
+            position: absolute;
+            left: 0; top: 0;
+            width: 40px; height: 40px;
+            background: var(--accent-color);
+            border-radius: 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+        }
+        
+        .spin-btn {
+            margin-top: 35px;
+            padding: 16px 60px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(118, 75, 162, 0.4);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+        .spin-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(118, 75, 162, 0.5); }
+        .spin-btn:active { transform: scale(0.95); }
+        .spin-btn:disabled { background: #b2bec3; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .result-container {
+            margin-top: 20px;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            padding-bottom: 20px;
+        }
+
+        .result-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2d3436;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s;
+        }
+        .result-text.show { opacity: 1; transform: translateY(0); }
+
+        .warning-msg {
+            background: #ff7675;
+            color: white;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(255, 118, 117, 0.4);
+            display: none;
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* --- 移动端适配 --- */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .app-container { flex-direction: column; }
+            
+            .sidebar { 
+                width: 100%; 
+                height: auto; 
+                padding: 10px;
+                flex-direction: row; 
+                overflow-x: auto; 
+                background: rgba(255,255,255,0.95);
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                align-items: center;
+                scrollbar-width: none; 
+            }
+            .sidebar::-webkit-scrollbar { display: none; } 
+
+            .sidebar h2 { display: none; }
+            
+            .topic-list { 
+                display: flex; 
+                flex-direction: row; 
+                gap: 10px; 
+                padding: 0 10px;
+            }
+            
+            .topic-item { 
+                margin-bottom: 0; 
+                padding: 6px 16px; 
+                font-size: 13px; 
+                border-radius: 20px;
+                background: #f1f2f6;
+                border: 1px solid transparent;
+                min-height: auto;
+            }
+            .topic-text { white-space: nowrap; margin-right: 6px; }
+            
+            .topic-item.active {
+                background: var(--primary-gradient);
+                color: white;
+                box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3);
+            }
+            .topic-item:hover { transform: none; }
+            
+            .btn-add-topic { 
+                margin-top: 0; margin-left: 5px; 
+                white-space: nowrap; height: 32px; width: 32px;
+                padding: 0; display: flex; align-items: center; justify-content: center;
+                border-radius: 50%; border-style: solid;
+            }
+
+            .main-content { padding: 15px; }
+            .input-card { padding: 15px; margin-bottom: 15px; }
+            .header-area input { font-size: 1.4rem; }
+            
+            .wheel-wrapper { padding: 6px; }
+            .wheel-container { width: 280px; height: 280px; }
+            
+            .spin-btn { width: 100%; margin-top: 25px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 左侧列表 -->
+    <div class="sidebar" id="sidebar">
+        <h2>我的决定</h2>
+        <ul class="topic-list" id="topicList">
+            <!-- JS生成列表项 -->
+        </ul>
+        <div class="btn-add-topic" id="btnAddTopic" title="添加新决定">+</div>
+    </div>
+
+    <!-- 右侧主区域 -->
+    <div class="main-content">
+        
+        <div class="input-card">
+            <div class="header-area">
+                <input type="text" id="topicTitle" placeholder="标题（如：去哪玩）" autocomplete="off">
+            </div>
+            <div class="options-editor">
+                <textarea id="topicOptions" placeholder="输入选项：上海 纽约 东京（用空格或逗号分隔）" autocomplete="off"></textarea>
+                <div class="options-footer">
+                    <span class="options-hint">选项越多越刺激</span>
+                    <span class="save-status" id="saveStatus">✓ 已保存</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="wheel-wrapper">
+            <div class="wheel-container">
+                <div class="pointer"></div>
+                <canvas id="wheelCanvas" width="800" height="800"></canvas>
+            </div>
+        </div>
+
+        <button class="spin-btn" id="spinBtn">开始做决定</button>
+
+        <div class="result-container">
+            <div class="result-text" id="resultText"></div>
+            <div class="warning-msg" id="warningMsg">⚠️ 同样的命运已经降临三次了！</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 数据配置 ---
+    const defaultTopics = [
+        { id: 't1', title: "去哪里旅游", options: ["上海", "东京", "纽约", "曼谷", "雅加达", "吉隆坡"] },
+        { id: 't2', title: "今天吃什么", options: ["麦当劳", "火锅", "沙拉", "便利店", "不吃了", "日料"] },
+        { id: 't3', title: "周末活动", options: ["睡觉", "打游戏", "看书", "爬山", "逛街"] }
+    ];
+
+    const colors = [
+        "#FF9FF3", "#FECA57", "#FF6B6B", "#48DBFB", "#1DD1A1",
+        "#54a0ff", "#5f27cd", "#ff9f43", "#00d2d3", "#ff6b81"
+    ];
+
+    // 核心状态
+    let topics = [];
+    let currentTopicId = null;
+    let currentRotation = 0; 
+    let isSpinning = false;
+    let sessionCounts = {}; 
+
+    // DOM 元素缓存
+    const els = {
+        sidebar: document.getElementById('sidebar'),
+        topicList: document.getElementById('topicList'),
+        btnAddTopic: document.getElementById('btnAddTopic'),
+        topicTitle: document.getElementById('topicTitle'),
+        topicOptions: document.getElementById('topicOptions'),
+        saveStatus: document.getElementById('saveStatus'),
+        canvas: document.getElementById('wheelCanvas'),
+        spinBtn: document.getElementById('spinBtn'),
+        resultText: document.getElementById('resultText'),
+        warningMsg: document.getElementById('warningMsg')
+    };
+    
+    // Canvas 上下文
+    const ctx = els.canvas.getContext('2d');
+
+    // --- 初始化 ---
+    function init() {
+        // 尝试从不同的key恢复数据，防止版本更新导致数据丢失
+        let stored = localStorage.getItem('decisionMaker_universal_data');
+        if (!stored) stored = localStorage.getItem('decisionMakerData_v3');
+        if (!stored) stored = localStorage.getItem('decisionMakerData_v2');
+        if (!stored) stored = localStorage.getItem('decisionMakerData');
+
+        if (stored) {
+            try {
+                topics = JSON.parse(stored);
+            } catch(e) {
+                console.error("数据损坏，重置为默认", e);
+                topics = JSON.parse(JSON.stringify(defaultTopics));
+            }
+        } else {
+            topics = JSON.parse(JSON.stringify(defaultTopics));
+        }
+
+        // 数据清洗：确保每个topic都有id和options
+        topics.forEach(t => {
+            if(!t.options) t.options = ["默认选项"];
+            if(!t.id) t.id = 't' + Math.random().toString(36).substr(2, 9);
+        });
+
+        // 选中第一个或创建新的
+        if (topics.length > 0) {
+            selectTopic(topics[0].id);
+        } else {
+            createNewTopic();
+        }
+
+        renderSidebar();
+        bindEvents();
+    }
+
+    // --- 数据保存 ---
+    function saveData() {
+        try {
+            // 使用统一的 Key
+            localStorage.setItem('decisionMaker_universal_data', JSON.stringify(topics));
+            showSaveStatus();
+        } catch (e) {
+            console.error("保存失败 (可能是隐私模式或空间已满):", e);
+        }
+    }
+
+    let saveTimeout;
+    function showSaveStatus() {
+        els.saveStatus.classList.add('visible');
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            els.saveStatus.classList.remove('visible');
+        }, 1500);
+    }
+
+    // --- 核心逻辑 ---
+    function getTopic(id) { 
+        return topics.find(t => t.id === id); 
+    }
+
+    function selectTopic(id) {
+        const topic = getTopic(id);
+        if (!topic) return;
+
+        currentTopicId = id;
+        
+        // 更新 UI
+        els.topicTitle.value = topic.title || "";
+        // 转换选项数组为字符串，用空格连接
+        els.topicOptions.value = Array.isArray(topic.options) ? topic.options.join(' ') : "";
+        
+        // 重置结果显示
+        els.resultText.innerText = "";
+        els.resultText.classList.remove('show');
+        els.warningMsg.style.display = 'none';
+        
+        // 重置计数器
+        sessionCounts = {}; 
+        topic.options.forEach(opt => sessionCounts[opt] = 0);
+
+        // 重置转盘角度
+        currentRotation = 0;
+        els.canvas.style.transform = `rotate(0deg)`;
+
+        renderSidebar();
+        drawWheel();
+    }
+
+    function createNewTopic() {
+        const newId = 't' + Date.now();
+        const newTopic = { id: newId, title: "新决定", options: ["是", "否"] };
+        topics.push(newTopic);
+        saveData();
+        selectTopic(newId);
+        
+        // 滚动逻辑
+        setTimeout(() => {
+            if (window.innerWidth <= 768) {
+                els.sidebar.scrollLeft = els.sidebar.scrollWidth;
+            } else {
+                els.topicList.scrollTop = els.topicList.scrollHeight;
+            }
+        }, 100);
+    }
+
+    function deleteTopic(id, event) {
+        event.stopPropagation(); // 防止触发 selectTopic
+        if (confirm("确定要删除这个决定事项吗？")) {
+            topics = topics.filter(t => t.id !== id);
+            if (topics.length === 0) {
+                createNewTopic();
+            } else {
+                // 如果删除的是当前选中的，切换到第一个
+                if (currentTopicId === id) {
+                    selectTopic(topics[0].id);
+                } else {
+                    saveData();
+                    renderSidebar();
+                }
+            }
+        }
+    }
+
+    function updateCurrentTopic() {
+        if (!currentTopicId) return;
+        const topic = getTopic(currentTopicId);
+        if (!topic) return;
+
+        // 1. 更新标题
+        topic.title = els.topicTitle.value;
+        
+        // 2. 更新选项
+        let rawOptions = els.topicOptions.value;
+        // 兼容中文逗号、英文逗号、换行符、空格
+        let opts = rawOptions.split(/[,\uff0c\n\s]+/).filter(t => t.trim() !== "");
+        if (opts.length === 0) opts = ["?"];
+        
+        // 如果选项内容有变，重置计数
+        if(JSON.stringify(topic.options) !== JSON.stringify(opts)) {
+            sessionCounts = {};
+            opts.forEach(o => sessionCounts[o] = 0);
+            els.resultText.innerText = "";
+            els.resultText.classList.remove('show');
+            els.warningMsg.style.display = 'none';
+        }
+
+        topic.options = opts;
+        
+        // 3. 执行保存和渲染
+        saveData();
+        
+        // 仅更新标题列表文字，不完全重绘避免输入中断（但这里简化处理直接重绘）
+        renderSidebar(); 
+        drawWheel();
+    }
+
+    // --- 渲染 UI ---
+    function renderSidebar() {
+        els.topicList.innerHTML = '';
+        topics.forEach(topic => {
+            const li = document.createElement('li');
+            li.className = `topic-item ${topic.id === currentTopicId ? 'active' : ''}`;
+            li.onclick = () => selectTopic(topic.id);
+            
+            // 完整显示标题
+            const displayTitle = topic.title || '(无标题)';
+
+            li.innerHTML = `
+                <span class="topic-text">${displayTitle}</span> 
+                <span class="btn-delete-topic" onclick="deleteTopic('${topic.id}', event)">✕</span>
+            `;
+            els.topicList.appendChild(li);
+        });
+    }
+
+    function drawWheel() {
+        if (!currentTopicId) return;
+        const topic = getTopic(currentTopicId);
+        if (!topic) return;
+
+        const options = topic.options;
+        const len = options.length;
+        const arc = 2 * Math.PI / len;
+        
+        const w = els.canvas.width;
+        const h = els.canvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const radius = w / 2 - 20;
+
+        ctx.clearRect(0, 0, w, h);
+
+        options.forEach((opt, i) => {
+            const angle = i * arc;
+            ctx.beginPath();
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, radius, angle, angle + arc);
+            ctx.lineTo(cx, cy);
+            ctx.fill();
+            
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle + arc / 2);
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 40px 'Noto Sans SC', sans-serif";
+            ctx.shadowColor = "rgba(0,0,0,0.1)";
+            ctx.shadowBlur = 4;
+            
+            let text = opt;
+            // 转盘上的文字太长还是稍微截断一下比较好看，否则会叠在一起
+            if (text.length > 8) text = text.substring(0, 7) + "..";
+            ctx.fillText(text, radius - 40, 14);
+            ctx.restore();
+        });
+
+        // 装饰中心
+        ctx.beginPath();
+        ctx.arc(cx, cy, 50, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        
+        // 装饰外环
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.stroke();
+    }
+
+    // --- 旋转 ---
+    function spin() {
+        if (isSpinning) return;
+        const topic = getTopic(currentTopicId);
+        if (!topic || topic.options.length < 1) return;
+
+        isSpinning = true;
+        els.spinBtn.disabled = true;
+        els.resultText.classList.remove('show');
+        els.warningMsg.style.display = 'none';
+
+        const randomDeg = Math.floor(Math.random() * 360);
+        const totalSpin = 1800 + randomDeg; 
+        currentRotation += totalSpin;
+        
+        els.canvas.style.transform = `rotate(-${currentRotation}deg)`;
+
+        setTimeout(() => {
+            finishSpin(currentRotation, topic.options);
+        }, 4000);
+    }
+
+    function finishSpin(rotation, options) {
+        isSpinning = false;
+        els.spinBtn.disabled = false;
+
+        const actualDeg = rotation % 360;
+        const sliceDeg = 360 / options.length;
+        let degFromStart = (360 - actualDeg + 270) % 360;
+        let index = Math.floor(degFromStart / sliceDeg);
+        index = index % options.length;
+
+        const result = options[index];
+        
+        if (!sessionCounts[result]) sessionCounts[result] = 0;
+        sessionCounts[result]++;
+
+        els.resultText.innerText = `🎉 ${result}`;
+        els.resultText.classList.add('show');
+        
+        if (sessionCounts[result] > 3) {
+            els.warningMsg.style.display = 'inline-block';
+        }
+    }
+
+    function bindEvents() {
+        els.btnAddTopic.addEventListener('click', createNewTopic);
+        
+        // 使用 input 事件确保实时保存
+        els.topicTitle.addEventListener('input', updateCurrentTopic);
+        els.topicOptions.addEventListener('input', updateCurrentTopic);
+        
+        els.spinBtn.addEventListener('click', spin);
+    }
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>
